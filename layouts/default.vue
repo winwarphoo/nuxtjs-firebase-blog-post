@@ -1,94 +1,111 @@
 <template>
-  <v-app dark>
-    <v-navigation-drawer
-      v-model="drawer"
-      :mini-variant="miniVariant"
-      :clipped="clipped"
-      fixed
-      app
-    >
-      <v-list>
-        <v-list-item
-          v-for="(item, i) in items"
-          :key="i"
-          :to="item.to"
-          router
-          exact
-        >
-          <v-list-item-action>
-            <v-icon>{{ item.icon }}</v-icon>
-          </v-list-item-action>
-          <v-list-item-content>
-            <v-list-item-title v-text="item.title" />
-          </v-list-item-content>
-        </v-list-item>
-      </v-list>
-    </v-navigation-drawer>
-    <v-app-bar
-      :clipped-left="clipped"
-      fixed
-      app
-    >
-      <v-app-bar-nav-icon @click.stop="drawer = !drawer" />
-      <v-btn
-        icon
-        @click.stop="miniVariant = !miniVariant"
-      >
-        <v-icon>mdi-{{ `chevron-${miniVariant ? 'right' : 'left'}` }}</v-icon>
-      </v-btn>
-      <v-btn
-        icon
-        @click.stop="clipped = !clipped"
-      >
-        <v-icon>mdi-application</v-icon>
-      </v-btn>
-      <v-btn
-        icon
-        @click.stop="fixed = !fixed"
-      >
-        <v-icon>mdi-minus</v-icon>
-      </v-btn>
-      <v-toolbar-title v-text="title" />
+  <v-app>
+    <v-app-bar color="primary" class="white--text" app>
+      <v-toolbar-title to="/">
+        Blog-Post
+      </v-toolbar-title>
       <v-spacer />
-      <v-btn
-        icon
-        @click.stop="rightDrawer = !rightDrawer"
-      >
-        <v-icon>mdi-menu</v-icon>
-      </v-btn>
+      <v-tooltip bottom>
+        <template #activator="{ on, attrs }">
+          <v-btn
+            class="white--text"
+            icon
+            text
+            to="/"
+            v-bind="attrs"
+            v-on="on"
+          >
+            <v-icon>mdi-home-variant-outline</v-icon>
+          </v-btn>
+        </template>
+        <span>Home</span>
+      </v-tooltip>
+      <div v-if="!user">
+        <v-tooltip bottom>
+          <template #activator="{ on, attrs }">
+            <v-btn
+              class="white--text"
+              icon
+              text
+              to="/login"
+              v-bind="attrs"
+              v-on="on"
+            >
+              <v-icon>mdi-account-circle</v-icon>
+            </v-btn>
+          </template>
+          <span>Login</span>
+        </v-tooltip>
+        <v-tooltip bottom>
+          <template #activator="{ on, attrs }">
+            <v-btn
+              class="white--text"
+              icon
+              text
+              to="/signup"
+              v-bind="attrs"
+              v-on="on"
+            >
+              <v-icon>mdi-account-multiple-plus</v-icon>
+            </v-btn>
+          </template>
+          <span>Sign Up</span>
+        </v-tooltip>
+      </div>
+      <div v-if="user">
+        <v-tooltip bottom>
+          <template #activator="{ on, attrs }">
+            <v-btn
+              class="white--text"
+              icon
+              text
+              to="/blog"
+              v-bind="attrs"
+              v-on="on"
+              @click="addBlog"
+            >
+              <v-icon>mdi-plus-thick</v-icon>
+            </v-btn>
+          </template>
+          <span>Add Blog</span>
+        </v-tooltip>
+        {{ user.displayName }}
+        <v-tooltip bottom>
+          <template #activator="{ on, attrs }">
+            <v-btn
+              class="white--text"
+              icon
+              text
+              to="/"
+              v-bind="attrs"
+              v-on="on"
+              @click="logout"
+            >
+              <v-icon>mdi-logout-variant</v-icon>
+            </v-btn>
+          </template>
+          <span>Logout</span>
+        </v-tooltip>
+      </div>
     </v-app-bar>
     <v-main>
       <v-container>
         <Nuxt />
       </v-container>
     </v-main>
-    <v-navigation-drawer
-      v-model="rightDrawer"
-      :right="right"
-      temporary
-      fixed
-    >
-      <v-list>
-        <v-list-item @click.native="right = !right">
-          <v-list-item-action>
-            <v-icon light>
-              mdi-repeat
-            </v-icon>
-          </v-list-item-action>
-          <v-list-item-title>Switch drawer (click me)</v-list-item-title>
-        </v-list-item>
-      </v-list>
-    </v-navigation-drawer>
-    <v-footer
-      :absolute="!fixed"
-      app
-    >
-      <span>&copy; {{ new Date().getFullYear() }}</span>
+    <v-footer color="primary" padless>
+      <v-row justify="center">
+        <v-col class="primary py-4 text-center white--text" cols="12">
+          {{ new Date().getFullYear() }} — <strong>Blog</strong>
+        </v-col>
+      </v-row>
     </v-footer>
   </v-app>
 </template>
 
 <script>
+import { signOut, onAuthStateChanged } from 'firebase/auth'
+import { auth } from '../plugins/firebase'
 export default {
   name: 'DefaultLayout',
   data () {
@@ -99,13 +116,13 @@ export default {
       items: [
         {
           icon: 'mdi-apps',
-          title: 'Welcome',
+          title: 'Index',
           to: '/'
         },
         {
-          icon: 'mdi-chart-bubble',
-          title: 'Inspire',
-          to: '/inspire'
+          icon: 'mdi-account-circle',
+          title: 'Login',
+          to: '/login'
         }
       ],
       miniVariant: false,
@@ -113,6 +130,40 @@ export default {
       rightDrawer: false,
       title: 'Vuetify.js'
     }
+  },
+  computed: {
+    user () {
+      return this.$store.state.user
+    }
+  },
+  mounted () {
+    this.onAuthStateChanged()
+  },
+  methods: {
+    onAuthStateChanged () {
+      onAuthStateChanged(auth, (user) => {
+        if (user) {
+          this.$store.dispatch('setUser', {
+            uid: user.uid,
+            displayName: user.displayName,
+            email: user.email
+          })
+        }
+      })
+    },
+    logout () {
+      signOut(auth).then(() => {
+        this.$store.dispatch('logout', null)
+      })
+    },
+    addBlog () {
+      localStorage.removeItem('editBlog')
+      this.$router.push('/blog')
+    }
   }
 }
 </script>
+
+<style scoped>
+
+</style>
